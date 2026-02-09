@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Row Tracker">
+<meta name="theme-color" content="#1e3a5f">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>London to Charleston — Training Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --text: #0f172a;
+  --text2: #64748b;
+  --border: #e2e8f0;
+  --blue: #2563eb;
+  --blue-lt: #dbeafe;
+  --green: #16a34a;
+  --green-lt: #dcfce7;
+  --amber: #d97706;
+  --amber-lt: #fef3c7;
+  --red: #dc2626;
+  --red-lt: #fee2e2;
+  --purple: #7c3aed;
+  --purple-lt: #ede9fe;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 70px; }
+
+/* ────── Header ────── */
+.header { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); color: white; padding: 20px 16px 16px; }
+.header h1 { font-size: 22px; font-weight: 700; margin-bottom: 2px; }
+.header .subtitle { font-size: 13px; opacity: 0.8; margin-bottom: 14px; }
+.stats-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.stat-pill { background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border-radius: 20px; padding: 6px 14px; font-size: 12px; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.stat-pill .num { font-weight: 700; font-size: 14px; }
+
+/* ────── Navigation ────── */
+.nav { display: flex; background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+.nav button { flex: 1; padding: 12px 8px; border: none; background: none; font-size: 13px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.nav button.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+
+/* ────── Main Content ────── */
+.main { max-width: 700px; margin: 0 auto; padding: 16px; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ────── Week Navigator ────── */
+.week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.week-nav button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.week-nav button:hover { background: var(--blue-lt); border-color: var(--blue); }
+.week-nav button:disabled { opacity: 0.3; cursor: default; }
+.week-nav button:disabled:hover { background: var(--card); border-color: var(--border); }
+.week-info { text-align: center; }
+.week-info .week-num { font-size: 18px; font-weight: 700; }
+.week-info .week-phase { font-size: 12px; color: var(--text2); }
+.week-info .week-dates { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+/* ────── Session Cards ────── */
+.cards { display: grid; gap: 10px; }
+.card { background: var(--card); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); border-left: 4px solid var(--border); cursor: pointer; transition: all 0.15s; position: relative; }
+.card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.card.type-rowing_steady, .card.type-rowing_long { border-left-color: var(--blue); }
+.card.type-rowing_intervals { border-left-color: var(--purple); }
+.card.type-legs { border-left-color: var(--green); }
+.card.type-calisthenics { border-left-color: var(--amber); }
+.card.type-rest { border-left-color: var(--border); cursor: default; }
+.card.type-event { border-left-color: var(--red); }
+.card.type-prep { border-left-color: var(--text2); }
+.card.completed { background: var(--green-lt); border-left-color: var(--green); }
+.card.skipped { background: var(--red-lt); border-left-color: var(--red); opacity: 0.7; }
+.card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.card-day { font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text2); }
+.card-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+.card-status.done { background: var(--green); color: white; }
+.card-status.skip { background: var(--red); color: white; }
+.card-status.today { background: var(--blue); color: white; }
+.card-status.adjusted { background: var(--amber-lt); color: var(--amber); }
+.card-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.card-detail { font-size: 13px; color: var(--text2); line-height: 1.4; }
+.card-detail .adjusted-pace { color: var(--amber); font-weight: 600; }
+.card-detail .original-pace { text-decoration: line-through; opacity: 0.5; margin-right: 4px; }
+.card-actions { display: flex; gap: 8px; margin-top: 10px; }
+.card-actions button { padding: 6px 14px; border-radius: 8px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.btn-log { background: var(--blue); color: white; }
+.btn-log:hover { background: #1d4ed8; }
+.btn-skip { background: var(--red-lt); color: var(--red); }
+.btn-skip:hover { background: #fecaca; }
+
+/* ────── Alerts ────── */
+.alerts { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.alert { padding: 12px 16px; border-radius: var(--radius); font-size: 13px; line-height: 1.4; }
+.alert-info { background: var(--blue-lt); color: #1e40af; }
+.alert-warn { background: var(--amber-lt); color: #92400e; }
+.alert-good { background: var(--green-lt); color: #166534; }
+
+/* ────── Modal ────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.modal-overlay.active { opacity: 1; pointer-events: all; }
+.modal-content { background: var(--card); border-radius: 20px 20px 0 0; width: 100%; max-width: 500px; max-height: 85vh; overflow-y: auto; padding: 24px 20px 32px; transform: translateY(100%); transition: transform 0.3s ease-out; }
+.modal-overlay.active .modal-content { transform: translateY(0); }
+.modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+.modal h2 { font-size: 18px; margin-bottom: 4px; }
+.modal .modal-sub { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
+.modal-section { margin-bottom: 16px; }
+.modal-section h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; color: var(--text2); margin-bottom: 8px; letter-spacing: 0.5px; }
+.modal-planned { background: var(--bg); padding: 12px; border-radius: 8px; font-size: 13px; line-height: 1.6; white-space: pre-line; }
+
+/* ────── Form Elements ────── */
+.form-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.form-group { flex: 1; }
+.form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 4px; }
+.form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; transition: border-color 0.15s; }
+.form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--blue); }
+.form-group textarea { resize: vertical; min-height: 60px; }
+.rpe-container { display: flex; align-items: center; gap: 12px; }
+.rpe-slider { flex: 1; -webkit-appearance: none; height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--green), var(--amber), var(--red)); outline: none; }
+.rpe-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: white; border: 2px solid var(--text); cursor: pointer; }
+.rpe-value { font-size: 20px; font-weight: 700; min-width: 30px; text-align: center; }
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.checkbox-item { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 10px; background: var(--bg); border-radius: 8px; cursor: pointer; }
+.checkbox-item input { accent-color: var(--green); }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.modal-actions button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.modal-actions .btn-save { background: var(--blue); color: white; }
+.modal-actions .btn-save:hover { background: #1d4ed8; }
+.modal-actions .btn-cancel { background: var(--bg); color: var(--text2); }
+.modal-actions .btn-danger { background: var(--red); color: white; }
+
+/* ────── Progress Charts ────── */
+.chart-container { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.chart-container h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.chart-container canvas { max-height: 250px; }
+.progress-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.progress-stat { background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); text-align: center; }
+.progress-stat .label { font-size: 11px; color: var(--text2); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+.progress-stat .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+
+/* ────── Settings ────── */
+.settings-section { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.settings-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.settings-section p { font-size: 13px; color: var(--text2); margin-bottom: 12px; }
+.settings-btn { display: block; width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-size: 14px; font-weight: 500; cursor: pointer; margin-bottom: 8px; transition: all 0.15s; text-align: center; }
+.settings-btn:hover { background: var(--bg); }
+.settings-btn.danger { color: var(--red); border-color: var(--red-lt); }
+.settings-btn.danger:hover { background: var(--red-lt); }
+#importInput { display: none; }
+
+/* ────── Responsive ────── */
+@media (min-width: 500px) {
+  .cards { grid-template-columns: 1fr 1fr; }
+  .header { padding: 24px 24px 20px; }
+  .main { padding: 20px; }
+  .modal-content { border-radius: 20px; margin-bottom: 20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>London &rarr; Charleston</h1>
+  <div class="subtitle">Charity Row Training Tracker</div>
+  <div class="stats-strip" id="statsStrip"></div>
+</div>
+
+<nav class="nav" id="nav">
+  <button class="active" data-tab="dashboard">Dashboard</button>
+  <button data-tab="progress">Progress</button>
+  <button data-tab="settings">Settings</button>
+</nav>
+
+<div class="main">
+  <div id="dashboard" class="tab-content active">
+    <div class="week-nav" id="weekNav"></div>
+    <div class="cards" id="sessionCards"></div>
+    <div class="alerts" id="alerts"></div>
+  </div>
+
+  <div id="progress" class="tab-content">
+    <div class="progress-stats" id="progressStats"></div>
+    <div class="chart-container"><h3>Pace Trend (Steady State)</h3><canvas id="paceChart"></canvas></div>
+    <div class="chart-container"><h3>Weekly Rowing Volume (minutes)</h3><canvas id="volumeChart"></canvas></div>
+    <div class="chart-container"><h3>Session Compliance</h3><canvas id="complianceChart"></canvas></div>
+    <div class="chart-container"><h3>Long Row Progression</h3><canvas id="longRowChart"></canvas></div>
+  </div>
+
+  <div id="settings" class="tab-content">
+    <div class="settings-section">
+      <h3>Data Backup</h3>
+      <p>Export your training data as a JSON file for safekeeping, or import a previous backup.</p>
+      <button class="settings-btn" onclick="exportData()">Export Data</button>
+      <button class="settings-btn" onclick="document.getElementById('importInput').click()">Import Data</button>
+      <input type="file" id="importInput" accept=".json" onchange="importData(event)">
+    </div>
+    <div class="settings-section">
+      <h3>Danger Zone</h3>
+      <p>This will erase all your logged workouts and adjustments. This cannot be undone.</p>
+      <button class="settings-btn danger" onclick="resetAllData()">Reset All Data</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-content modal" id="modalContent"></div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// SECTION 1: UTILITIES
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+const START = new Date(2026, 1, 9); // Feb 9 2026
+const EVENT_DATE = new Date(2026, 5, 3); // Jun 3 2026
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const SHORT_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+function fmtDate(d) { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
+function fmtDateFull(d) { return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); }
+
+function paceToSec(p) {
+  if (!p || typeof p !== 'string') return 0;
+  const parts = p.split(':');
+  return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+}
+function secToPace(s) {
+  if (!s || s <= 0) return '--:--';
+  const m = Math.floor(s / 60);
+  const sec = Math.round(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+function paceMid(range) {
+  if (!range || !range.includes('-')) return paceToSec(range);
+  const [a, b] = range.split('-').map(s => paceToSec(s.trim()));
+  return (a + b) / 2;
+}
+
+function getCurrentWeekNum() {
+  const today = new Date();
+  const diff = Math.floor((today - START) / 86400000);
+  return Math.max(1, Math.min(16, Math.floor(diff / 7) + 1));
+}
+
+function isToday(date) {
+  const t = new Date();
+  return date.getFullYear() === t.getFullYear() && date.getMonth() === t.getMonth() && date.getDate() === t.getDate();
+}
+function isPast(date) {
+  const t = new Date(); t.setHours(0,0,0,0);
+  const d = new Date(date); d.setHours(0,0,0,0);
+  return d < t;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// SECTION 2: PLAN DATA
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+const PHASES = ['Base Building','Base Building','Base Building','Base Building',
+  'Building Volume','Building Volume','Building Volume','Building Volume',
+  'Event-Specific','Event-Specific','Event-Specific','Event-Specific',
+  'Peak & Taper','Peak & Taper','Peak & Taper','Peak & Taper'];
+const DELOAD = [false,false,false,true, false,false,false,true, false,false,false,true, false,false,false,false];
+const TAPER = [false,false,false,false, false,false,false,false, false,false,false,false, false,false,true,true];
+
+// Monday: Steady State
+const MON = [
+  {dur:20, pace:"2:25-2:30", rate:"18-20", notes:"Focus on technique: long strokes, steady rhythm."},
+  {dur:25, pace:"2:23-2:28", rate:"18-20", notes:"Maintain consistent stroke rate. Drive sequence: legs-back-arms."},
+  {dur:30, pace:"2:22-2:25", rate:"18-20", notes:"Building duration. Keep heart rate in zone 2."},
+  {dur:25, pace:"2:28-2:30", rate:"18-20", notes:"DELOAD. Easy effort, focus purely on technique."},
+  {dur:35, pace:"2:20-2:22", rate:"20-22", notes:"Entering volume phase. Stay relaxed through the recovery."},
+  {dur:40, pace:"2:18-2:20", rate:"20-22", notes:"Pushing duration up. Practice mental strategies for longer rows."},
+  {dur:45, pace:"2:18-2:20", rate:"20-22", notes:"Good volume. Monitor stroke rate — aim for 20-22 spm."},
+  {dur:35, pace:"2:22-2:25", rate:"20-22", notes:"DELOAD. Reduced volume, easy effort."},
+  {dur:50, pace:"2:18-2:20", rate:"20-22", notes:"Event-specific phase. This pace is close to your event target."},
+  {dur:55, pace:"2:16-2:18", rate:"20-22", notes:"Pushing toward an hour. Stay disciplined with pacing."},
+  {dur:60, pace:"2:16-2:18", rate:"20-22", notes:"Full hour at event pace — great benchmark session."},
+  {dur:45, pace:"2:20-2:22", rate:"20-22", notes:"DELOAD. Let the body recover before peak phase."},
+  {dur:60, pace:"2:15-2:18", rate:"20-22", notes:"Peak week. Strong sustained effort. You're fit now."},
+  {dur:55, pace:"2:15-2:18", rate:"20-22", notes:"Maintain intensity, slight volume reduction beginning."},
+  {dur:40, pace:"2:18-2:20", rate:"20-22", notes:"TAPER. Reduced volume. Keep the engine ticking over."},
+  {dur:25, pace:"2:22-2:25", rate:"18-20", notes:"EVENT WEEK. Very easy. Just stay loose and ready."},
+];
+
+// Wednesday: Intervals
+const WED = [
+  {session:"6 x 3 min @ 2:08-2:12 / 2 min easy", dur:50, pace:"2:08-2:12", notes:"Short, sharp intervals. Focus on powerful leg drive."},
+  {session:"8 x 3 min @ 2:08-2:12 / 2 min easy", dur:55, pace:"2:08-2:12", notes:"Adding 2 more reps. Keep form crisp even when tired."},
+  {session:"5 x 5 min @ 2:06-2:10 / 2 min easy", dur:55, pace:"2:06-2:10", notes:"Longer intervals. Settle into rhythm early in each piece."},
+  {session:"4 x 3 min @ 2:10-2:15 / 2 min easy", dur:40, pace:"2:10-2:15", notes:"DELOAD. Reduced volume, keep it controlled."},
+  {session:"6 x 5 min @ 2:06-2:10 / 2 min easy", dur:60, pace:"2:06-2:10", notes:"Good volume of quality work. Negative split each interval."},
+  {session:"4 x 8 min @ 2:08-2:12 / 3 min easy", dur:65, pace:"2:08-2:12", notes:"Longer sustained efforts. Practice holding pace under fatigue."},
+  {session:"5 x 8 min @ 2:06-2:10 / 3 min easy", dur:70, pace:"2:06-2:10", notes:"Big session. Mental toughness builder. Stay composed."},
+  {session:"4 x 5 min @ 2:10-2:15 / 2 min easy", dur:50, pace:"2:10-2:15", notes:"DELOAD. Maintain quality, reduce load."},
+  {session:"3 x 12 min @ 2:06-2:10 / 3 min easy", dur:65, pace:"2:06-2:10", notes:"Event-specific intervals. These mirror your 2hr block pattern."},
+  {session:"4 x 10 min @ 2:05-2:08 / 3 min easy", dur:70, pace:"2:05-2:08", notes:"Sustained quality. Keep the pace for the team."},
+  {session:"3 x 15 min @ 2:06-2:10 / 3 min easy", dur:70, pace:"2:06-2:10", notes:"45 min of quality rowing. Huge session."},
+  {session:"3 x 8 min @ 2:10-2:12 / 3 min easy", dur:50, pace:"2:10-2:12", notes:"DELOAD. Let the body absorb the big weeks."},
+  {session:"2 x 20 min @ 2:06-2:10 / 5 min easy", dur:65, pace:"2:06-2:10", notes:"Long sustained threshold efforts. Event simulation pace."},
+  {session:"2 x 20 min @ 2:05-2:08 / 5 min easy", dur:65, pace:"2:05-2:08", notes:"Peak intervals. Sharpest you'll be. Trust the training."},
+  {session:"4 x 5 min @ 2:06-2:10 / 3 min easy", dur:50, pace:"2:06-2:10", notes:"TAPER. Short and sharp. Keep the speed in your legs."},
+  {session:"3 x 3 min @ 2:10-2:15 / 2 min easy", dur:35, pace:"2:10-2:15", notes:"EVENT WEEK. Light sharpener only."},
+];
+
+// Thursday: Leg Strength
+const THU = [
+  {row:15, exercises:["Back Squats 3x10","Romanian Deadlifts 3x10","Walking Lunges 3x12 each","Hip Thrusts 3x12","Calf Raises 3x15"], notes:"Start light. Perfect the movement patterns."},
+  {row:15, exercises:["Back Squats 3x10","Romanian Deadlifts 3x10","Walking Lunges 3x12 each","Hip Thrusts 3x12","Calf Raises 3x15"], notes:"Add 2.5-5kg to each lift if last week felt comfortable."},
+  {row:20, exercises:["Back Squats 3x10","Romanian Deadlifts 3x10","Bulgarian Split Squats 3x10 each","Hip Thrusts 3x12","Calf Raises 3x15"], notes:"Introducing split squats. Start with bodyweight or light dumbbells."},
+  {row:15, exercises:["Back Squats 2x10","Romanian Deadlifts 2x10","Bodyweight Lunges 2x12","Calf Raises 2x15"], notes:"DELOAD. Reduce sets and weight by ~30%."},
+  {row:20, exercises:["Back Squats 3x8","Romanian Deadlifts 3x8","Bulgarian Split Squats 3x10 each","Leg Press 3x10","Calf Raises 3x15"], notes:"Dropping to 8 reps — increase the load."},
+  {row:25, exercises:["Back Squats 4x8","Romanian Deadlifts 3x8","Bulgarian Split Squats 3x10 each","Leg Press 3x10","Calf Raises 3x15"], notes:"Adding a set on squats. Progressive overload."},
+  {row:25, exercises:["Back Squats 4x8","Romanian Deadlifts 4x8","Bulgarian Split Squats 3x8 each","Leg Press 3x10","Calf Raises 3x15"], notes:"Good strength block. Handling meaningful weight now."},
+  {row:20, exercises:["Back Squats 2x8","Romanian Deadlifts 2x8","Bodyweight Split Squats 2x10","Calf Raises 2x15"], notes:"DELOAD. Light weights, reduced volume."},
+  {row:25, exercises:["Back Squats 4x6","Romanian Deadlifts 4x8","Single-Leg Deadlift 3x8 each","Hip Thrusts 3x10","Calf Raises 3x15"], notes:"Lower reps, heavier weights. Build power for the drive."},
+  {row:25, exercises:["Back Squats 4x6","Romanian Deadlifts 4x8","Single-Leg Deadlift 3x8 each","Hip Thrusts 3x10","Calf Raises 3x15"], notes:"Maintain load. Focus on explosive leg drive."},
+  {row:30, exercises:["Back Squats 4x6","Romanian Deadlifts 4x6","Bulgarian Split Squats 3x8 each","Hip Thrusts 3x10","Calf Raises 3x15"], notes:"Peak strength session. Push the numbers this week."},
+  {row:20, exercises:["Back Squats 2x8","Romanian Deadlifts 2x8","Bodyweight Lunges 2x10","Calf Raises 2x15"], notes:"DELOAD. Recovery before final push."},
+  {row:25, exercises:["Back Squats 3x6","Romanian Deadlifts 3x8","Bulgarian Split Squats 3x8 each","Hip Thrusts 3x10","Calf Raises 3x12"], notes:"Maintaining strength. Don't chase PRs now."},
+  {row:25, exercises:["Back Squats 3x6","Romanian Deadlifts 3x8","Bulgarian Split Squats 3x8 each","Hip Thrusts 3x10","Calf Raises 3x12"], notes:"Last full strength session. Good form, controlled effort."},
+  {row:20, exercises:["Back Squats 2x8 (light)","Romanian Deadlifts 2x8 (light)","Bodyweight Lunges 2x10","Calf Raises 2x12"], notes:"TAPER. Light weights only. Keep the movement patterns fresh."},
+  {row:15, exercises:["Bodyweight Squats 2x15","Bodyweight Lunges 2x10","Calf Raises 2x15"], notes:"EVENT WEEK. Bodyweight only. Just get the blood flowing."},
+];
+
+// Saturday: Long Row
+const SAT = [
+  {dur:30, pace:"2:25-2:30", notes:"First long row. Find a comfortable rhythm and hold it."},
+  {dur:35, pace:"2:23-2:28", notes:"5 min added. Stay relaxed. Practice fuelling strategy."},
+  {dur:40, pace:"2:22-2:25", notes:"Building the aerobic engine. Should feel conversational."},
+  {dur:30, pace:"2:28-2:30", notes:"DELOAD. Easy and short. Enjoy it."},
+  {dur:50, pace:"2:20-2:22", notes:"First 50-min row! Break it into 10-min mental segments."},
+  {dur:55, pace:"2:18-2:22", notes:"Practice hydration during the row (sip every 15 min)."},
+  {dur:60, pace:"2:18-2:20", notes:"First full hour! Major milestone."},
+  {dur:45, pace:"2:22-2:25", notes:"DELOAD. Easy, mental and physical recovery."},
+  {dur:75, pace:"2:18-2:20", notes:"75 minutes! Building serious endurance. Eat something light beforehand."},
+  {dur:80, pace:"2:16-2:20", notes:"Approaching event duration. Focus on sustainable pacing."},
+  {dur:90, pace:"2:15-2:20", notes:"90 MIN EVENT SIMULATION. Row as if it's game day. Practice everything."},
+  {dur:60, pace:"2:20-2:22", notes:"DELOAD. Easy hour to recover from last week's big effort."},
+  {dur:100, pace:"2:15-2:18", notes:"100 minutes! Close to event duration. Dial in your pacing strategy."},
+  {dur:120, pace:"2:15-2:18", notes:"FULL 2-HOUR DRESS REHEARSAL. Simulate event conditions completely."},
+  {dur:60, pace:"2:18-2:20", notes:"TAPER. Easy 60 min. Let the body supercompensate."},
+  {dur:30, pace:"2:22-2:25", notes:"EVENT WEEK. Light 30 min to stay sharp. You're ready."},
+];
+function generatePlan() {
+  const weeks = [];
+  for (let w = 0; w < 16; w++) {
+    const weekStart = addDays(START, w * 7);
+    const mon = MON[w], wed = WED[w], thu = THU[w], sat = SAT[w];
+    const tag = DELOAD[w] ? ' (Deload)' : TAPER[w] ? ' (Taper)' : '';
+
+    weeks.push({
+      weekNum: w + 1,
+      phase: PHASES[w],
+      tag,
+      startDate: weekStart,
+      endDate: addDays(weekStart, 5),
+      sessions: [
+        {
+          id: `w${w+1}_mon`, dayIdx: 0, date: addDays(weekStart, 0),
+          type: 'rowing_steady', title: 'Rowing — Steady State',
+          detail: `${mon.dur} min @ ${mon.pace}/500m | Rate: ${mon.rate} spm`,
+          planned: { duration: mon.dur, pace: mon.pace, paceMid: paceMid(mon.pace), strokeRate: mon.rate },
+          totalDur: mon.dur + 15, notes: mon.notes,
+          warmup: '5 min easy rowing + dynamic stretches', cooldown: '5 min easy rowing + static stretch'
+        },
+        {
+          id: `w${w+1}_tue`, dayIdx: 1, date: addDays(weekStart, 1),
+          type: 'calisthenics', title: 'Calisthenics + Rowing Mobility',
+          detail: 'Your calisthenics session + 15 min rowing mobility',
+          planned: {}, totalDur: 75, notes: 'Add hip flexor stretches, thoracic spine rotations, shoulder dislocates, foam rolling after your calisthenics.',
+        },
+        {
+          id: `w${w+1}_wed`, dayIdx: 2, date: addDays(weekStart, 2),
+          type: 'rowing_intervals', title: 'Rowing — Intervals',
+          detail: wed.session,
+          planned: { duration: wed.dur, pace: wed.pace, paceMid: paceMid(wed.pace), session: wed.session },
+          totalDur: wed.dur + 15, notes: wed.notes,
+          warmup: '10 min easy rowing (build pace gradually)', cooldown: '5 min easy rowing + stretch'
+        },
+        {
+          id: `w${w+1}_thu`, dayIdx: 3, date: addDays(weekStart, 3),
+          type: 'legs', title: 'Leg Strength + Easy Row',
+          detail: thu.exercises.join(' | ') + ` + ${thu.row} min easy row`,
+          planned: { exercises: thu.exercises, rowDuration: thu.row },
+          totalDur: 80, notes: thu.notes,
+        },
+        {
+          id: `w${w+1}_fri`, dayIdx: 4, date: addDays(weekStart, 4),
+          type: 'calisthenics', title: 'Calisthenics + Core & Mobility',
+          detail: 'Your calisthenics session + core stability & stretching',
+          planned: {}, totalDur: 75, notes: 'Add planks, dead bugs, side planks, bird dogs, then foam roll and stretch.',
+        },
+        {
+          id: `w${w+1}_sat`, dayIdx: 5, date: addDays(weekStart, 5),
+          type: 'rowing_long', title: `Long Row — ${sat.dur} min`,
+          detail: `${sat.dur} min @ ${sat.pace}/500m`,
+          planned: { duration: sat.dur, pace: sat.pace, paceMid: paceMid(sat.pace) },
+          totalDur: sat.dur + 20, notes: sat.notes,
+          warmup: '5 min easy rowing', cooldown: '5 min easy + thorough stretch (10 min)'
+        },
+      ]
+    });
+  }
+  return weeks;
+}
+
+const PLAN = generatePlan();
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// SECTION 3: STORAGE
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+const STORAGE_KEY = 'london_charleston_tracker';
+
+function loadLog() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY + '_log')) || {}; } catch { return {}; }
+}
+function saveLog(log) { localStorage.setItem(STORAGE_KEY + '_log', JSON.stringify(log)); }
+function loadAdjustments() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY + '_adj')) || {}; } catch { return {}; }
+}
+function saveAdjustments(adj) { localStorage.setItem(STORAGE_KEY + '_adj', JSON.stringify(adj)); }
+
+function exportData() {
+  const data = { log: loadLog(), adjustments: loadAdjustments(), exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rowing_tracker_backup.json';
+  a.click();
+}
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.log) saveLog(data.log);
+      if (data.adjustments) saveAdjustments(data.adjustments);
+      alert('Data imported successfully!');
+      renderAll();
+    } catch { alert('Invalid file format.'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+function resetAllData() {
+  if (confirm('Are you sure? This will delete ALL your logged workouts and cannot be undone.')) {
+    localStorage.removeItem(STORAGE_KEY + '_log');
+    localStorage.removeItem(STORAGE_KEY + '_adj');
+    renderAll();
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// SECTION 4: ADAPTIVE ENGINE
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+function runAdaptiveEngine() {
+  const log = loadLog();
+  const adj = { paceAdj: {}, alerts: [], volumeHold: null, weeklyRPE: {} };
+
+  // ──── Pace Adjustments ────
+  // Group rowing logs by type and compute rolling average delta
+  const typeGroups = { rowing_steady: [], rowing_intervals: [], rowing_long: [] };
+
+  for (const week of PLAN) {
+    for (const s of week.sessions) {
+      const entry = log[s.id];
+      if (entry && entry.status === 'completed' && entry.paceSeconds && s.planned.paceMid) {
+        const delta = s.planned.paceMid - entry.paceSeconds; // positive = faster than planned
+        if (typeGroups[s.type] !== undefined) {
+          typeGroups[s.type].push({ delta, rpe: entry.rpe || 5, weekNum: week.weekNum });
+        }
+      }
+    }
+  }
+
+  for (const [type, entries] of Object.entries(typeGroups)) {
+    if (entries.length < 3) { adj.paceAdj[type] = 0; continue; }
+    // Use last 3 sessions
+    const recent = entries.slice(-3);
+    const avgDelta = recent.reduce((s, e) => s + e.delta, 0) / recent.length;
+    const avgRPE = recent.reduce((s, e) => s + e.rpe, 0) / recent.length;
+
+    let adjustment = 0;
+    if (avgDelta > 3 && avgRPE <= 6) {
+      // Consistently faster AND it's feeling easy → make targets faster (lower pace)
+      adjustment = -Math.min(Math.round(avgDelta * 0.5), 5);
+    } else if (avgDelta < -5 || avgRPE >= 8) {
+      // Consistently slower OR high RPE → ease targets (higher pace)
+      adjustment = Math.min(Math.abs(avgDelta < -5 ? avgDelta * 0.5 : 3), 5);
+    }
+    // Cap at ±10 seconds
+    adj.paceAdj[type] = Math.max(-10, Math.min(10, Math.round(adjustment)));
+  }
+
+  // ──── Weekly RPE tracking ────
+  for (const week of PLAN) {
+    const weekEntries = week.sessions.map(s => log[s.id]).filter(e => e && e.status === 'completed' && e.rpe);
+    if (weekEntries.length >= 3) {
+      adj.weeklyRPE[week.weekNum] = weekEntries.reduce((s, e) => s + e.rpe, 0) / weekEntries.length;
+    }
+  }
+
+  // ──── Volume / Phase Hold ────
+  // If last 2 completed weeks have avg RPE >= 8, suggest holding
+  const completedWeeks = Object.entries(adj.weeklyRPE).sort((a, b) => b[0] - a[0]).slice(0, 2);
+  if (completedWeeks.length >= 2) {
+    const recentAvg = completedWeeks.reduce((s, [_, r]) => s + r, 0) / completedWeeks.length;
+    if (recentAvg >= 8) {
+      adj.volumeHold = parseInt(completedWeeks[0][0]);
+      adj.alerts.push({ type: 'warn', text: `Your RPE has been very high (avg ${recentAvg.toFixed(1)}). Consider repeating Week ${adj.volumeHold}'s targets before progressing.` });
+    }
+  }
+
+  // ──── Compliance ────
+  const allPast = [];
+  for (const week of PLAN) {
+    for (const s of week.sessions) {
+      if (isPast(s.date)) allPast.push(s);
+    }
+  }
+  const completed = allPast.filter(s => log[s.id] && log[s.id].status === 'completed').length;
+  const skipped = allPast.filter(s => log[s.id] && log[s.id].status === 'skipped').length;
+  const notLogged = allPast.length - completed - skipped;
+  const compliance = allPast.length > 0 ? completed / allPast.length : 1;
+
+  if (compliance < 0.8 && allPast.length >= 6) {
+    adj.alerts.push({ type: 'warn', text: `Compliance is at ${Math.round(compliance * 100)}%. If time is tight, prioritise the 3 key rowing sessions: Monday steady state, Wednesday intervals, and Saturday long row.` });
+  }
+  if (compliance >= 0.95 && allPast.length >= 6) {
+    adj.alerts.push({ type: 'good', text: `${Math.round(compliance * 100)}% compliance — outstanding consistency! You're building a strong base.` });
+  }
+
+  // ──── Skipped key session alerts ────
+  for (const week of PLAN) {
+    for (const s of week.sessions) {
+      if (log[s.id] && log[s.id].status === 'skipped' && (s.type === 'rowing_long' || s.type === 'rowing_intervals')) {
+        // Check if next week's equivalent exists and isn't yet completed
+        const nextWeek = PLAN.find(w => w.weekNum === week.weekNum + 1);
+        if (nextWeek) {
+          const equiv = nextWeek.sessions.find(ns => ns.type === s.type);
+          if (equiv && (!log[equiv.id] || log[equiv.id].status !== 'completed')) {
+            if (!isPast(equiv.date)) {
+              // Will be handled in rendering — add 10% volume to next week
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ──── Pace adjustment alerts ────
+  for (const [type, val] of Object.entries(adj.paceAdj)) {
+    if (val !== 0) {
+      const typeName = type === 'rowing_steady' ? 'steady state' : type === 'rowing_intervals' ? 'interval' : 'long row';
+      const dir = val < 0 ? 'faster' : 'slower';
+      adj.alerts.push({ type: val < 0 ? 'good' : 'info', text: `Your ${typeName} targets have been adjusted ${Math.abs(val)}s ${dir} based on your recent performance.` });
+    }
+  }
+
+  adj.compliance = compliance;
+  adj.completed = completed;
+  adj.total = allPast.length;
+  adj.skipped = skipped;
+
+  saveAdjustments(adj);
+  return adj;
+}
+
+function getAdjustedPaceMid(session, adj) {
+  if (!session.planned.paceMid) return null;
+  const typeAdj = (adj.paceAdj && adj.paceAdj[session.type]) || 0;
+  return session.planned.paceMid + typeAdj; // typeAdj is negative for faster
+}
+
+function getAdjustedPaceRange(session, adj) {
+  const typeAdj = (adj.paceAdj && adj.paceAdj[session.type]) || 0;
+  if (typeAdj === 0 || !session.planned.pace) return null;
+  const parts = session.planned.pace.split('-');
+  const newLow = paceToSec(parts[0].trim()) + typeAdj;
+  const newHigh = paceToSec(parts[1].trim()) + typeAdj;
+  return `${secToPace(newLow)}-${secToPace(newHigh)}`;
+}
+
+function getSkipVolumeBoost(session, log) {
+  // Check if previous week's same type was skipped → add 10%
+  const match = session.id.match(/w(\d+)_/);
+  if (!match) return 0;
+  const wk = parseInt(match[1]);
+  if (wk <= 1) return 0;
+  const prevId = `w${wk-1}_${session.id.split('_')[1]}`;
+  const prevLog = log[prevId];
+  if (prevLog && prevLog.status === 'skipped') {
+    return 0.1; // 10% boost
+  }
+  return 0;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// SECTION 5: UI RENDERING
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+let currentWeek = getCurrentWeekNum();
+let charts = {};
+
+function renderAll() {
+  const adj = runAdaptiveEngine();
+  renderStatsStrip(adj);
+  renderWeekNav();
+  renderSessionCards(adj);
+  renderAlerts(adj);
+  renderProgressCharts(adj);
+}
+
+function renderStatsStrip(adj) {
+  const daysUntil = Math.max(0, Math.ceil((EVENT_DATE - new Date()) / 86400000));
+  const log = loadLog();
+
+  // Total rowing minutes completed
+  let totalRowMin = 0;
+  for (const [id, entry] of Object.entries(log)) {
+    if (entry.status === 'completed' && entry.duration) totalRowMin += entry.duration;
+  }
+
+  const html = `
+    <div class="stat-pill"><span class="num">${daysUntil}</span> days to event</div>
+    <div class="stat-pill"><span class="num">${Math.round((adj.compliance || 0) * 100)}%</span> compliance</div>
+    <div class="stat-pill"><span class="num">${totalRowMin}</span> min rowed</div>
+    <div class="stat-pill"><span class="num">Wk ${currentWeek}</span> of 16</div>
+  `;
+  document.getElementById('statsStrip').innerHTML = html;
+}
+
+function renderWeekNav() {
+  const week = PLAN[currentWeek - 1];
+  document.getElementById('weekNav').innerHTML = `
+    <button onclick="changeWeek(-1)" ${currentWeek <= 1 ? 'disabled' : ''}>&larr;</button>
+    <div class="week-info">
+      <div class="week-num">Week ${week.weekNum}${week.tag}</div>
+      <div class="week-phase">${week.phase}</div>
+      <div class="week-dates">${fmtDate(week.startDate)} — ${fmtDate(week.endDate)}</div>
+    </div>
+    <button onclick="changeWeek(1)" ${currentWeek >= 16 ? 'disabled' : ''}>&rarr;</button>
+  `;
+}
+
+function renderSessionCards(adj) {
+  const week = PLAN[currentWeek - 1];
+  const log = loadLog();
+  let html = '';
+
+  for (const s of week.sessions) {
+    const entry = log[s.id];
+    const status = entry ? entry.status : null;
+    const today = isToday(s.date);
+    const past = isPast(s.date);
+    const boost = getSkipVolumeBoost(s, log);
+    const adjPace = getAdjustedPaceRange(s, adj);
+    const isAdjusted = adjPace || boost > 0;
+
+    let statusClass = '';
+    let statusBadge = '';
+    if (status === 'completed') { statusClass = 'completed'; statusBadge = '<span class="card-status done">Done</span>'; }
+    else if (status === 'skipped') { statusClass = 'skipped'; statusBadge = '<span class="card-status skip">Skipped</span>'; }
+    else if (today) { statusBadge = '<span class="card-status today">Today</span>'; }
+    else if (isAdjusted && !status) { statusBadge = '<span class="card-status adjusted">Adjusted</span>'; }
+
+    // Build detail line with adjustments
+    let detailHTML = s.detail;
+    if (adjPace && !status) {
+      detailHTML = s.detail.replace(s.planned.pace, `<span class="original-pace">${s.planned.pace}</span><span class="adjusted-pace">${adjPace}</span>`);
+    }
+    if (boost > 0 && s.planned.duration && !status) {
+      const boosted = Math.round(s.planned.duration * (1 + boost));
+      detailHTML = detailHTML.replace(`${s.planned.duration} min`, `<span class="original-pace">${s.planned.duration} min</span><span class="adjusted-pace">${boosted} min</span>`);
+    }
+
+    // Show actual results if completed
+    let resultHTML = '';
+    if (status === 'completed' && entry) {
+      const parts = [];
+      if (entry.duration) parts.push(`${entry.duration} min`);
+      if (entry.pace) parts.push(`${entry.pace}/500m`);
+      if (entry.strokeRate) parts.push(`${entry.strokeRate} spm`);
+      if (entry.rpe) parts.push(`RPE ${entry.rpe}`);
+      if (parts.length) resultHTML = `<div class="card-detail" style="margin-top:4px;color:var(--green);font-weight:500;">Actual: ${parts.join(' · ')}</div>`;
+    }
+
+    let actions = '';
+    if (!status && (today || past)) {
+      actions = `<div class="card-actions">
+        <button class="btn-log" onclick="event.stopPropagation();openLogModal('${s.id}')">Log Workout</button>
+        <button class="btn-skip" onclick="event.stopPropagation();skipSession('${s.id}')">Skip</button>
+      </div>`;
+    } else if (status === 'completed' || status === 'skipped') {
+      actions = `<div class="card-actions">
+        <button class="btn-log" style="background:var(--text2)" onclick="event.stopPropagation();openLogModal('${s.id}')">Edit</button>
+      </div>`;
+    }
+
+    html += `
+      <div class="card type-${s.type} ${statusClass}" onclick="openLogModal('${s.id}')">
+        <div class="card-top">
+          <span class="card-day">${SHORT_DAYS[s.dayIdx]} ${fmtDate(s.date)}</span>
+          ${statusBadge}
+        </div>
+        <div class="card-title">${s.title}</div>
+        <div class="card-detail">${detailHTML}</div>
+        ${resultHTML}
+        ${actions}
+      </div>
+    `;
+  }
+
+  document.getElementById('sessionCards').innerHTML = html;
+}
+
+function renderAlerts(adj) {
+  if (!adj.alerts || !adj.alerts.length) { document.getElementById('alerts').innerHTML = ''; return; }
+  document.getElementById('alerts').innerHTML = adj.alerts.map(a =>
+    `<div class="alert alert-${a.type}">${a.text}</div>`
+  ).join('');
+}
+
+function changeWeek(delta) {
+  currentWeek = Math.max(1, Math.min(16, currentWeek + delta));
+  const adj = runAdaptiveEngine();
+  renderWeekNav();
+  renderSessionCards(adj);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// SECTION 6: MODAL
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+function findSession(id) {
+  for (const w of PLAN) for (const s of w.sessions) if (s.id === id) return { session: s, week: w };
+  return null;
+}
+function openLogModal(sessionId) {
+  const found = findSession(sessionId);
+  if (!found) return;
+  const { session: s, week: w } = found;
+  const log = loadLog();
+  const entry = log[s.id] || {};
+  const adj = loadAdjustments();
+  const adjPace = getAdjustedPaceRange(s, adj);
+  const isRowing = s.type.startsWith('rowing');
+  const isLegs = s.type === 'legs';
+  const isCal = s.type === 'calisthenics';
+
+  let plannedHTML = '';
+  if (isRowing) {
+    const pace = adjPace || s.planned.pace || '';
+    plannedHTML = `<div class="modal-planned">
+Duration: ${s.planned.duration} min${pace ? `\nTarget Pace: ${pace}/500m` : ''}${s.planned.strokeRate ? `\nStroke Rate: ${s.planned.strokeRate} spm` : ''}${s.planned.session ? `\nSession: ${s.planned.session}` : ''}${s.warmup ? `\nWarm-up: ${s.warmup}` : ''}${s.cooldown ? `\nCool-down: ${s.cooldown}` : ''}${s.notes ? `\n\n${s.notes}` : ''}
+</div>`;
+  } else if (isLegs) {
+    plannedHTML = `<div class="modal-planned">${s.planned.exercises ? s.planned.exercises.join('\n') : ''}
+\nThen: ${s.planned.rowDuration} min easy row @ 2:25-2:30
+${s.notes ? '\n' + s.notes : ''}</div>`;
+  } else {
+    plannedHTML = `<div class="modal-planned">${s.notes || s.detail}</div>`;
+  }
+
+  let formHTML = '';
+  if (isRowing) {
+    formHTML = `
+      <div class="form-row">
+        <div class="form-group"><label>Duration (min)</label><input type="number" id="f_dur" value="${entry.duration || s.planned.duration || ''}" min="1" max="300"></div>
+        <div class="form-group"><label>Avg Pace (/500m)</label><input type="text" id="f_pace" value="${entry.pace || ''}" placeholder="2:18"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Stroke Rate (spm)</label><input type="number" id="f_rate" value="${entry.strokeRate || ''}" min="10" max="50"></div>
+        <div class="form-group"><label>Distance (m)</label><input type="number" id="f_dist" value="${entry.distance || ''}" min="0"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>RPE (Rate of Perceived Exertion)</label>
+        <div class="rpe-container">
+          <input type="range" class="rpe-slider" id="f_rpe" min="1" max="10" value="${entry.rpe || 5}" oninput="document.getElementById('rpeVal').textContent=this.value">
+          <span class="rpe-value" id="rpeVal">${entry.rpe || 5}</span>
+        </div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="f_notes" placeholder="How did it feel?">${entry.notes || ''}</textarea></div>
+    `;
+  } else if (isLegs) {
+    const exerciseChecks = (s.planned.exercises || []).map((ex, i) => {
+      const checked = entry.exercises && entry.exercises[i] ? 'checked' : '';
+      return `<label class="checkbox-item"><input type="checkbox" class="f_ex" ${checked}> ${ex}</label>`;
+    }).join('');
+    formHTML = `
+      <div class="form-group" style="margin-bottom:12px"><label>Exercises Completed</label><div class="checkbox-group">${exerciseChecks}</div></div>
+      <div class="form-row">
+        <div class="form-group"><label>Easy Row Duration (min)</label><input type="number" id="f_dur" value="${entry.duration || s.planned.rowDuration || ''}" min="0"></div>
+        <div class="form-group"><label>RPE</label>
+          <div class="rpe-container">
+            <input type="range" class="rpe-slider" id="f_rpe" min="1" max="10" value="${entry.rpe || 5}" oninput="document.getElementById('rpeVal').textContent=this.value">
+            <span class="rpe-value" id="rpeVal">${entry.rpe || 5}</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-group"><label>Notes (weights used, etc.)</label><textarea id="f_notes" placeholder="e.g. Squats: 80kg, RDL: 60kg">${entry.notes || ''}</textarea></div>
+    `;
+  } else {
+    formHTML = `
+      <div class="form-group" style="margin-bottom:12px">
+        <label>RPE</label>
+        <div class="rpe-container">
+          <input type="range" class="rpe-slider" id="f_rpe" min="1" max="10" value="${entry.rpe || 5}" oninput="document.getElementById('rpeVal').textContent=this.value">
+          <span class="rpe-value" id="rpeVal">${entry.rpe || 5}</span>
+        </div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="f_notes" placeholder="Any notes on today's session?">${entry.notes || ''}</textarea></div>
+    `;
+  }
+
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <div class="modal-handle"></div>
+    <h2>${s.title}</h2>
+    <div class="modal-sub">${w.phase} — Week ${w.weekNum} — ${fmtDateFull(s.date)}</div>
+    <div class="modal-section"><h3>Planned Workout</h3>${plannedHTML}</div>
+    <div class="modal-section"><h3>Log Your Workout</h3>${formHTML}</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-danger" onclick="skipSession('${s.id}');closeModal()">Skip</button>
+      <button class="btn-save" onclick="saveSession('${s.id}')">Save</button>
+    </div>
+  `;
+
+  document.getElementById('modal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+}
+
+function saveSession(sessionId) {
+  const found = findSession(sessionId);
+  if (!found) return;
+  const s = found.session;
+  const log = loadLog();
+  const isRowing = s.type.startsWith('rowing');
+  const isLegs = s.type === 'legs';
+
+  const entry = { status: 'completed', loggedAt: new Date().toISOString() };
+
+  if (isRowing) {
+    entry.duration = parseInt(document.getElementById('f_dur')?.value) || null;
+    const paceStr = document.getElementById('f_pace')?.value?.trim();
+    entry.pace = paceStr || null;
+    entry.paceSeconds = paceStr ? paceToSec(paceStr) : null;
+    entry.strokeRate = parseInt(document.getElementById('f_rate')?.value) || null;
+    entry.distance = parseInt(document.getElementById('f_dist')?.value) || null;
+  } else if (isLegs) {
+    entry.duration = parseInt(document.getElementById('f_dur')?.value) || null;
+    entry.exercises = Array.from(document.querySelectorAll('.f_ex')).map(cb => cb.checked);
+  }
+
+  entry.rpe = parseInt(document.getElementById('f_rpe')?.value) || 5;
+  entry.notes = document.getElementById('f_notes')?.value || '';
+
+  log[sessionId] = entry;
+  saveLog(log);
+  closeModal();
+  renderAll();
+}
+
+function skipSession(sessionId) {
+  const log = loadLog();
+  log[sessionId] = { status: 'skipped', loggedAt: new Date().toISOString() };
+  saveLog(log);
+  renderAll();
+}
+
+// Close modal on overlay click
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// SECTION 7: CHARTS
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+function renderProgressCharts(adj) {
+  const log = loadLog();
+
+  // Progress stats
+  const totalPlannedMin = PLAN.reduce((s, w) => s + w.sessions.filter(se => se.type.startsWith('rowing')).reduce((a, se) => a + (se.planned.duration || 0), 0), 0);
+  let totalActualMin = 0;
+  for (const [id, e] of Object.entries(log)) { if (e.status === 'completed' && e.duration) totalActualMin += e.duration; }
+  const sessionsCompleted = Object.values(log).filter(e => e.status === 'completed').length;
+  const totalSessions = PLAN.reduce((s, w) => s + w.sessions.length, 0);
+
+  document.getElementById('progressStats').innerHTML = `
+    <div class="progress-stat"><div class="label">Sessions Done</div><div class="value">${sessionsCompleted}/${totalSessions}</div></div>
+    <div class="progress-stat"><div class="label">Compliance</div><div class="value" style="color:${(adj.compliance||0)>=0.8?'var(--green)':'var(--amber)'}">${Math.round((adj.compliance||0)*100)}%</div></div>
+    <div class="progress-stat"><div class="label">Total Rowing</div><div class="value">${totalActualMin} min</div></div>
+    <div class="progress-stat"><div class="label">Days to Event</div><div class="value">${Math.max(0, Math.ceil((EVENT_DATE - new Date()) / 86400000))}</div></div>
+  `;
+
+  // Destroy existing charts
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+
+  // ──── Pace Trend Chart ────
+  const paceData = { labels: [], planned: [], actual: [] };
+  for (const w of PLAN) {
+    for (const s of w.sessions.filter(s => s.type === 'rowing_steady')) {
+      paceData.labels.push(`W${w.weekNum}`);
+      paceData.planned.push(s.planned.paceMid);
+      const e = log[s.id];
+      paceData.actual.push(e && e.paceSeconds ? e.paceSeconds : null);
+    }
+  }
+
+  charts.pace = new Chart(document.getElementById('paceChart'), {
+    type: 'line',
+    data: {
+      labels: paceData.labels,
+      datasets: [
+        { label: 'Planned Pace', data: paceData.planned, borderColor: '#94a3b8', borderDash: [5,5], pointRadius: 3, tension: 0.3 },
+        { label: 'Actual Pace', data: paceData.actual, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.1)', pointRadius: 5, tension: 0.3, fill: true },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+      scales: {
+        y: {
+          reverse: true, // Lower pace = faster (should be higher on chart)
+          ticks: { callback: v => secToPace(v) },
+          title: { display: true, text: 'Pace /500m (lower is faster)' }
+        }
+      }
+    }
+  });
+
+  // ──── Weekly Volume Chart ────
+  const volData = { labels: [], planned: [], actual: [] };
+  for (const w of PLAN) {
+    volData.labels.push(`W${w.weekNum}`);
+    const plannedMin = w.sessions.filter(s => s.type.startsWith('rowing')).reduce((a, s) => a + (s.planned.duration || 0), 0);
+    volData.planned.push(plannedMin);
+    const actualMin = w.sessions.reduce((a, s) => {
+      const e = log[s.id];
+      return a + (e && e.status === 'completed' && e.duration ? e.duration : 0);
+    }, 0);
+    volData.actual.push(actualMin || null);
+  }
+
+  charts.volume = new Chart(document.getElementById('volumeChart'), {
+    type: 'bar',
+    data: {
+      labels: volData.labels,
+      datasets: [
+        { label: 'Planned (rowing)', data: volData.planned, backgroundColor: 'rgba(37,99,235,0.2)', borderColor: '#2563eb', borderWidth: 1 },
+        { label: 'Actual (all)', data: volData.actual, backgroundColor: 'rgba(22,163,74,0.5)', borderColor: '#16a34a', borderWidth: 1 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+      scales: { y: { title: { display: true, text: 'Minutes' }, beginAtZero: true } }
+    }
+  });
+
+  // ──── Compliance Chart ────
+  const compData = { labels: [], rates: [] };
+  for (const w of PLAN) {
+    compData.labels.push(`W${w.weekNum}`);
+    const total = w.sessions.filter(s => isPast(s.date)).length;
+    const done = w.sessions.filter(s => log[s.id] && log[s.id].status === 'completed').length;
+    compData.rates.push(total > 0 ? Math.round((done / total) * 100) : null);
+  }
+
+  charts.compliance = new Chart(document.getElementById('complianceChart'), {
+    type: 'line',
+    data: {
+      labels: compData.labels,
+      datasets: [{
+        label: 'Compliance %',
+        data: compData.rates,
+        borderColor: '#16a34a',
+        backgroundColor: 'rgba(22,163,74,0.1)',
+        pointRadius: 5,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+    }
+  });
+
+  // ──── Long Row Progression ────
+  const longData = { labels: [], planned: [], actual: [] };
+  for (const w of PLAN) {
+    for (const s of w.sessions.filter(s => s.type === 'rowing_long')) {
+      longData.labels.push(`W${w.weekNum}`);
+      longData.planned.push(s.planned.duration);
+      const e = log[s.id];
+      longData.actual.push(e && e.duration ? e.duration : null);
+    }
+  }
+
+  charts.longRow = new Chart(document.getElementById('longRowChart'), {
+    type: 'bar',
+    data: {
+      labels: longData.labels,
+      datasets: [
+        { label: 'Planned (min)', data: longData.planned, backgroundColor: 'rgba(37,99,235,0.2)', borderColor: '#2563eb', borderWidth: 1 },
+        { label: 'Actual (min)', data: longData.actual, backgroundColor: 'rgba(22,163,74,0.6)', borderColor: '#16a34a', borderWidth: 1 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12 } },
+        annotation: { annotations: { line120: { type: 'line', yMin: 120, yMax: 120, borderColor: '#dc2626', borderDash: [5,5], label: { content: '2hr event target', display: true } } } }
+      },
+      scales: { y: { title: { display: true, text: 'Minutes' }, beginAtZero: true } }
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// SECTION 8: NAVIGATION & INIT
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Tab switching
+document.querySelectorAll('.nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'progress') {
+      renderProgressCharts(runAdaptiveEngine());
+    }
+  });
+});
+
+// Keyboard nav
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') changeWeek(-1);
+  if (e.key === 'ArrowRight') changeWeek(1);
+  if (e.key === 'Escape') closeModal();
+});
+
+// Touch swipe for week nav
+let touchStartX = 0;
+document.getElementById('dashboard').addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; });
+document.getElementById('dashboard').addEventListener('touchend', e => {
+  const diff = touchStartX - e.changedTouches[0].clientX;
+  if (Math.abs(diff) > 60) changeWeek(diff > 0 ? 1 : -1);
+});
+
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// Init
+renderAll();
+</script>
+</body>
+</html>
